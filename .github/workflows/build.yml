@@ -1,4 +1,4 @@
-name: Build GeoIP (Manual Only)
+name: Build geoip.dat
 
 on:
   workflow_dispatch:
@@ -19,7 +19,7 @@ jobs:
     - name: Clone geoip tool
       run: git clone https://github.com/v2fly/geoip.git
 
-    - name: Prepare data
+    - name: Merge CDN IPs
       run: |
         mkdir -p geoip/data
         cat data/*.txt > geoip/data/cdnip.txt
@@ -32,6 +32,7 @@ jobs:
           "input": [
             {
               "type": "text",
+              "action": "add",
               "tag": "cdnip",
               "file": "data/cdnip.txt"
             }
@@ -40,14 +41,14 @@ jobs:
         }
         EOF
 
-    - name: Build geoip.dat
+    - name: Build
       run: |
         cd geoip
         go mod download
         go run .
 
-    - name: Upload artifact
+    - name: Upload result
       uses: actions/upload-artifact@v4
       with:
-        name: geoip-dat
+        name: geoip
         path: geoip/geoip.dat
