@@ -1,0 +1,55 @@
+name: Build GeoIP
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"   # 每天自动更新
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.22'
+
+    - name: Clone geoip tool
+      run: git clone https://github.com/v2fly/geoip.git
+
+    - name: Prepare data
+      run: |
+        mkdir -p geoip/data
+        cat data/*.txt > geoip/data/cdnip.txt
+        sort -u geoip/data/cdnip.txt -o geoip/data/cdnip.txt
+
+    - name: Write config
+      run: |
+        cat > geoip/config.json <<EOF
+        {
+          "input": [
+            {
+              "type": "text",
+              "tag": "cdnip",
+              "file": "data/cdnip.txt"
+            }
+          ],
+          "output": "geoip.dat"
+        }
+        EOF
+
+    - name: Build
+      run: |
+        cd geoip
+        go mod download
+        go run .
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: geoip
+        path: geoip/geoip.dat
