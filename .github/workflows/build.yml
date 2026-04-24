@@ -1,4 +1,4 @@
-name: Build geoip.dat (manual)
+name: Build geoip.dat
 
 on:
   workflow_dispatch:
@@ -19,40 +19,21 @@ jobs:
     - name: Clone geoip tool
       run: git clone https://github.com/v2fly/geoip.git
 
-    - name: Prepare CDN IP data
+    - name: Prepare CDN IP list
       run: |
         mkdir -p geoip/data
 
-        # 合并所有 txt
+        # 合并你的 CDN IP
         cat data/*.txt > geoip/data/cdnip.txt
 
-        # 去重
+        # 去重（非常重要）
         sort -u geoip/data/cdnip.txt -o geoip/data/cdnip.txt
 
-    - name: Write config.json
-      run: |
-        cat > geoip/config.json <<EOF
-        {
-          "input": [
-            {
-              "type": "text",
-              "action": "add",
-              "name": "cdnip",
-              "inputDir": "data"
-            }
-          ],
-          "output": "geoip.dat"
-        }
-        EOF
-
-    - name: Build geoip.dat
+    - name: Build geoip.dat (NO CONFIG)
       run: |
         cd geoip
-        go mod download
-        go run .
 
-    - name: Upload geoip.dat
-      uses: actions/upload-artifact@v4
-      with:
-        name: geoip
-        path: geoip/geoip.dat
+        go mod download
+
+        # ⚠️ 关键：直接执行，不用 config.json
+        go run ./...
