@@ -1,9 +1,7 @@
-name: Build GeoIP
+name: Build GeoIP (Manual Only)
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "0 0 * * *"   # 每天自动更新
 
 jobs:
   build:
@@ -42,7 +40,7 @@ jobs:
         }
         EOF
 
-    - name: Build
+    - name: Build geoip.dat
       run: |
         cd geoip
         go mod download
@@ -51,5 +49,5 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: geoip
+        name: geoip-dat
         path: geoip/geoip.dat
