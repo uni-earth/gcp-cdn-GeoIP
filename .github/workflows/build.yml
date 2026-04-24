@@ -1,25 +1,102 @@
-name: Build CDN IP list
+name: Build Custom GeoIP DAT (Merged)
 
+# 触发条件：当 data 目录下的 txt 文件发生修改，或手动点击触发
 on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'data/**/*.txt'
   workflow_dispatch:
 
+# 赋予 GitHub Actions 发布 Release 的权限
+permissions:
+  contents: write
+
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Merge CDN IP
-      run: |
-        mkdir -p out
+      - name: Setup Go Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
 
-        cat data/*.txt > out/cdnip.txt
-        sort -u out/cdnip.txt -o out/cdnip.txt
+      - name: Install v2fly/geoip compiler
+        run: |
+          # 获取官方编译工具
+          go install github.com/v2fly/geoip@latest
 
-    - name: Upload CDN list
-      uses: actions/upload-artifact@v4
-      with:
-        name: cdnip
-        path: out/cdnip.txt
+      - name: Merge and Clean TXT files
+        run: |
+          # 1. 初始化一个干净的合并文件
+          touch merged_cdnip.txt
+          
+          # 2. 遍历并合并所有的 txt 文件
+          for file in data/*.txt; do
+            # 确保文件真实存在，防止通配符匹配失败报错
+            if [ -f "$file" ]; then
+              cat "$file" >> merged_cdnip.txt
+              echo "" >> merged_cdnip.txt # 强制换行防粘连
+            fi
+          done
+          
+          # 3. 终极防坑：清理 Windows 换行符 (\r) 和多余的空行
+          sed -i 's/\r//g' merged_cdnip.txt
+          sed -i '/^[[:space:]]*$/d' merged_cdnip.txt
+          
+          # 4. 打印预览，方便日后在 Actions 日志里排查
+          echo "==== Merged file preview (Top 10 lines) ===="
+          head -n 10 merged_cdnip.txt
+          echo "=========================================="
+
+      - name: Generate config.json
+        run: |
+          # 写入固定的配置文件，指定唯一分类名为 cdnip
+          cat <<EOF > config.json
+          {
+            "input": [
+              {
+                "type": "text",
+                "action": "add",
+                "args": {
+                  "name": "cdnip",
+                  "uri": "./merged_cdnip.txt"
+                }
+              }
+            ],
+            "output": [
+              {
+                "type": "v2rayGeoIPDat",
+                "action": "output"
+              }
+            ]
+          }
+          EOF
+
+      - name: Compile Custom GeoIP.dat
+        run: |
+          # 确保输出目录存在
+          mkdir -p output
+          # 运行编译
+          $(go env GOPATH)/bin/geoip -c config.json
+          # 重命名为你专属的文件名
+          mv output/geoip.dat output/my_custom_ip.dat
+
+      - name: Generate Release Tag
+        id: tag
+        # 使用精确到分钟的时间戳作为版本号，如 202604240136
+        run: echo "release_tag=$(date +'%Y%m%d%H%M')" >> $GITHUB_ENV
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.release_tag }}
+          name: "Custom IP DAT - ${{ env.release_tag }}"
+          files: output/cdn.dat
+          draft: false
+          prerelease: false
