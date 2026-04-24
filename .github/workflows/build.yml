@@ -1,4 +1,4 @@
-name: Build geoip.dat
+name: Build geoip.dat (stable)
 
 on:
   workflow_dispatch:
@@ -11,29 +11,39 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v4
 
-    - name: Setup Go
-      uses: actions/setup-go@v5
-      with:
-        go-version: '1.22'
-
-    - name: Clone geoip tool
-      run: git clone https://github.com/v2fly/geoip.git
-
-    - name: Prepare CDN IP list
+    - name: Install tools
       run: |
-        mkdir -p geoip/data
+        sudo apt update
+        sudo apt install -y wget tar
+
+    - name: Download sing-box geoip builder
+      run: |
+        mkdir -p sb
+        wget -O sb/sing-box.tar.gz \
+        https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
+
+        tar -xzf sb/sing-box.tar.gz -C sb
+
+    - name: Prepare CDN IP
+      run: |
+        mkdir -p data
 
         # 合并你的 CDN IP
-        cat data/*.txt > geoip/data/cdnip.txt
+        cat data/*.txt > data/cdnip.txt
+        sort -u data/cdnip.txt -o data/cdnip.txt
 
-        # 去重（非常重要）
-        sort -u geoip/data/cdnip.txt -o geoip/data/cdnip.txt
-
-    - name: Build geoip.dat (NO CONFIG)
+    - name: Generate geoip.dat (STABLE WAY)
       run: |
-        cd geoip
+        mkdir -p out
 
-        go mod download
+        # ⚠️ sing-box 方式：直接生成 geoip
+        sb/sing-box geoip convert \
+          --input data/cdnip.txt \
+          --output out/geoip.dat \
+          --code cdnip
 
-        # ⚠️ 关键：直接执行，不用 config.json
-        go run ./...
+    - name: Upload result
+      uses: actions/upload-artifact@v4
+      with:
+        name: geoip
+        path: out/geoip.dat
