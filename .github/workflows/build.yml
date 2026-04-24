@@ -1,4 +1,4 @@
-name: Build geoip.dat
+name: Build geoip.dat (manual)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+    - name: Checkout repo
       uses: actions/checkout@v4
 
     - name: Setup Go
@@ -19,13 +19,17 @@ jobs:
     - name: Clone geoip tool
       run: git clone https://github.com/v2fly/geoip.git
 
-    - name: Merge CDN IPs
+    - name: Prepare CDN IP data
       run: |
         mkdir -p geoip/data
+
+        # 合并所有 txt
         cat data/*.txt > geoip/data/cdnip.txt
+
+        # 去重
         sort -u geoip/data/cdnip.txt -o geoip/data/cdnip.txt
 
-    - name: Write config
+    - name: Write config.json
       run: |
         cat > geoip/config.json <<EOF
         {
@@ -33,21 +37,21 @@ jobs:
             {
               "type": "text",
               "action": "add",
-              "tag": "cdnip",
-              "file": "data/cdnip.txt"
+              "name": "cdnip",
+              "inputDir": "data"
             }
           ],
           "output": "geoip.dat"
         }
         EOF
 
-    - name: Build
+    - name: Build geoip.dat
       run: |
         cd geoip
         go mod download
         go run .
 
-    - name: Upload result
+    - name: Upload geoip.dat
       uses: actions/upload-artifact@v4
       with:
         name: geoip
