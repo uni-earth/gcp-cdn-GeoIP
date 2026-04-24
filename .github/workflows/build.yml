@@ -1,4 +1,4 @@
-name: Build geoip.dat (stable)
+name: Build CDN IP list
 
 on:
   workflow_dispatch:
@@ -8,42 +8,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
+    - name: Checkout
       uses: actions/checkout@v4
 
-    - name: Install tools
-      run: |
-        sudo apt update
-        sudo apt install -y wget tar
-
-    - name: Download sing-box geoip builder
-      run: |
-        mkdir -p sb
-        wget -O sb/sing-box.tar.gz \
-        https://github.com/SagerNet/sing-box/releases/latest/download/sing-box-linux-amd64.tar.gz
-
-        tar -xzf sb/sing-box.tar.gz -C sb
-
-    - name: Prepare CDN IP
-      run: |
-        mkdir -p data
-
-        # 合并你的 CDN IP
-        cat data/*.txt > data/cdnip.txt
-        sort -u data/cdnip.txt -o data/cdnip.txt
-
-    - name: Generate geoip.dat (STABLE WAY)
+    - name: Merge CDN IP
       run: |
         mkdir -p out
 
-        # ⚠️ sing-box 方式：直接生成 geoip
-        sb/sing-box geoip convert \
-          --input data/cdnip.txt \
-          --output out/geoip.dat \
-          --code cdnip
+        cat data/*.txt > out/cdnip.txt
+        sort -u out/cdnip.txt -o out/cdnip.txt
 
-    - name: Upload result
+    - name: Upload CDN list
       uses: actions/upload-artifact@v4
       with:
-        name: geoip
-        path: out/geoip.dat
+        name: cdnip
+        path: out/cdnip.txt
